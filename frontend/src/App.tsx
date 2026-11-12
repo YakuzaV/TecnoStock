@@ -1,29 +1,29 @@
 
 import { useState } from 'react'
 import {
-  LayoutDashboard,
-  Package,
-  Warehouse,
-  ShoppingCart,
-  Receipt,
-  ChartNoAxesCombined,
-  FileBarChart,
-  Bell,
-  Search,
-  Plus,
-  AlertTriangle,
-  TrendingUp,
-  Boxes,
-  DollarSign,
+  LayoutDashboard, Package, Warehouse, ShoppingCart,
+  Receipt, ChartNoAxesCombined, FileBarChart, Bell,
+  Plus, Search, Pencil, Trash2, X, Save, Boxes
 } from 'lucide-react'
 import './App.css'
 
-const productos = [
-  { id: 1, nombre: 'Mouse Logitech', categoria: 'Periféricos', stock: 12, minimo: 5, costo: 35000, precio: 55000 },
-  { id: 2, nombre: 'Teclado mecánico', categoria: 'Periféricos', stock: 5, minimo: 5, costo: 120000, precio: 175000 },
-  { id: 3, nombre: 'SSD 1 TB', categoria: 'Almacenamiento', stock: 3, minimo: 5, costo: 210000, precio: 285000 },
-  { id: 4, nombre: 'Memoria RAM 16 GB', categoria: 'Componentes', stock: 8, minimo: 5, costo: 95000, precio: 145000 },
-  { id: 5, nombre: 'Monitor 24 pulgadas', categoria: 'Monitores', stock: 2, minimo: 4, costo: 390000, precio: 520000 },
+type Producto = {
+  id: number
+  sku: string
+  nombre: string
+  categoria: string
+  stock: number
+  minimo: number
+  costo: number
+  precio: number
+}
+
+const productosIniciales: Producto[] = [
+  { id: 1, sku: 'MOU-001', nombre: 'Mouse Logitech', categoria: 'Periféricos', stock: 12, minimo: 5, costo: 35000, precio: 55000 },
+  { id: 2, sku: 'TEC-001', nombre: 'Teclado mecánico', categoria: 'Periféricos', stock: 5, minimo: 5, costo: 120000, precio: 175000 },
+  { id: 3, sku: 'SSD-001', nombre: 'SSD 1 TB', categoria: 'Almacenamiento', stock: 3, minimo: 5, costo: 210000, precio: 285000 },
+  { id: 4, sku: 'RAM-001', nombre: 'Memoria RAM 16 GB', categoria: 'Componentes', stock: 8, minimo: 5, costo: 95000, precio: 145000 },
+  { id: 5, sku: 'MON-001', nombre: 'Monitor 24 pulgadas', categoria: 'Monitores', stock: 2, minimo: 4, costo: 390000, precio: 520000 },
 ]
 
 const menu = [
@@ -43,22 +43,136 @@ const moneda = (valor: number) =>
     maximumFractionDigits: 0,
   }).format(valor)
 
+const formularioVacio = {
+  sku: '',
+  nombre: '',
+  categoria: 'Periféricos',
+  stock: 0,
+  minimo: 5,
+  costo: 0,
+  precio: 0,
+}
+
 function App() {
   const [seccion, setSeccion] = useState('Dashboard')
+  const [productos, setProductos] = useState(productosIniciales)
   const [busqueda, setBusqueda] = useState('')
+  const [modalAbierto, setModalAbierto] = useState(false)
+  const [productoEditando, setProductoEditando] = useState<number | null>(null)
+  const [formulario, setFormulario] = useState(formularioVacio)
+  const [error, setError] = useState('')
 
   const inventario = productos.reduce(
-    (total, producto) => total + producto.stock * producto.costo,
-    0
+    (total, p) => total + p.stock * p.costo, 0
   )
 
-  const alertas = productos.filter(
-    producto => producto.stock <= producto.minimo
+  const alertas = productos.filter(p => p.stock <= p.minimo)
+
+  const valorVenta = productos.reduce(
+    (total, p) => total + p.stock * p.precio, 0
   )
 
-  const filtrados = productos.filter(producto =>
-    producto.nombre.toLowerCase().includes(busqueda.toLowerCase())
+  const margenPotencial = valorVenta > 0
+    ? ((valorVenta - inventario) / valorVenta) * 100
+    : 0
+
+  const filtrados = productos.filter(p =>
+    `${p.nombre} ${p.sku} ${p.categoria}`
+      .toLowerCase()
+      .includes(busqueda.toLowerCase())
   )
+
+  function abrirNuevo() {
+    setFormulario(formularioVacio)
+    setProductoEditando(null)
+    setError('')
+    setModalAbierto(true)
+  }
+
+  function abrirEdicion(producto: Producto) {
+    setFormulario({
+      sku: producto.sku,
+      nombre: producto.nombre,
+      categoria: producto.categoria,
+      stock: producto.stock,
+      minimo: producto.minimo,
+      costo: producto.costo,
+      precio: producto.precio,
+    })
+    setProductoEditando(producto.id)
+    setError('')
+    setModalAbierto(true)
+  }
+
+  function guardarProducto(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setError('')
+
+    if (!formulario.sku.trim() || !formulario.nombre.trim()) {
+      setError('El SKU y el nombre son obligatorios.')
+      return
+    }
+
+    const skuRepetido = productos.some(
+      p => p.sku.toLowerCase() === formulario.sku.trim().toLowerCase()
+        && p.id !== productoEditando
+    )
+
+    if (skuRepetido) {
+      setError('Ya existe un producto con ese SKU.')
+      return
+    }
+
+    if (
+      formulario.stock < 0 ||
+      formulario.minimo < 0 ||
+      formulario.costo <= 0 ||
+      formulario.precio <= 0
+    ) {
+      setError('Verifica las cantidades y los valores ingresados.')
+      return
+    }
+
+    if (formulario.precio < formulario.costo) {
+      setError('El precio de venta no puede ser inferior al costo.')
+      return
+    }
+
+    if (productoEditando !== null) {
+      setProductos(actuales =>
+        actuales.map(p =>
+          p.id === productoEditando
+            ? { ...p, ...formulario, sku: formulario.sku.trim(), nombre: formulario.nombre.trim() }
+            : p
+        )
+      )
+    } else {
+      setProductos(actuales => [
+        ...actuales,
+        {
+          id: Date.now(),
+          ...formulario,
+          sku: formulario.sku.trim(),
+          nombre: formulario.nombre.trim(),
+        },
+      ])
+    }
+
+    setModalAbierto(false)
+  }
+
+  function eliminarProducto(id: number) {
+    const producto = productos.find(p => p.id === id)
+    if (!producto) return
+
+    const confirmar = window.confirm(
+      `¿Deseas eliminar el producto "${producto.nombre}"?`
+    )
+
+    if (confirmar) {
+      setProductos(actuales => actuales.filter(p => p.id !== id))
+    }
+  }
 
   return (
     <div className="app">
@@ -76,12 +190,14 @@ function App() {
         <nav aria-label="Navegación principal">
           {menu.map(item => {
             const Icono = item.icono
-
             return (
               <button
                 key={item.nombre}
                 className={`menu-item ${seccion === item.nombre ? 'activo' : ''}`}
-                onClick={() => setSeccion(item.nombre)}
+                onClick={() => {
+                  setSeccion(item.nombre)
+                  setBusqueda('')
+                }}
               >
                 <Icono size={19} />
                 <span>{item.nombre}</span>
@@ -105,9 +221,8 @@ function App() {
             <span className="ruta">TecnoStock / {seccion}</span>
             <h1>{seccion}</h1>
           </div>
-
           <div className="acciones">
-            <span className="entorno">Datos de ejemplo</span>
+            <span className="entorno">Datos de demostración</span>
             <button className="icon-button" aria-label="Notificaciones">
               <Bell size={21} />
             </button>
@@ -115,7 +230,7 @@ function App() {
           </div>
         </header>
 
-        {seccion === 'Dashboard' ? (
+        {seccion === 'Dashboard' && (
           <>
             <div className="bienvenida">
               <div>
@@ -134,28 +249,23 @@ function App() {
               </div>
 
               <div className="tarjeta">
-                <div className="tarjeta-icono morado"><DollarSign size={23} /></div>
+                <div className="tarjeta-icono morado">$</div>
                 <span>Valor del inventario</span>
                 <strong>{moneda(inventario)}</strong>
-                <small>Calculado al costo unitario</small>
+                <small>Valor calculado al costo</small>
               </div>
 
               <div className="tarjeta">
-                <div className="tarjeta-icono naranja"><AlertTriangle size={23} /></div>
+                <div className="tarjeta-icono naranja">!</div>
                 <span>Productos con alerta</span>
                 <strong>{alertas.length}</strong>
                 <small>Stock menor o igual al mínimo</small>
               </div>
 
               <div className="tarjeta">
-                <div className="tarjeta-icono verde"><TrendingUp size={23} /></div>
+                <div className="tarjeta-icono verde">%</div>
                 <span>Margen potencial</span>
-                <strong>
-                  {(
-                    productos.reduce((t, p) => t + (p.precio - p.costo) * p.stock, 0) /
-                    productos.reduce((t, p) => t + p.precio * p.stock, 0) * 100
-                  ).toFixed(1)}%
-                </strong>
+                <strong>{margenPotencial.toFixed(1)}%</strong>
                 <small>Estimación sobre existencias</small>
               </div>
             </section>
@@ -167,19 +277,33 @@ function App() {
                   <p>Consulta de existencias y precios</p>
                 </div>
                 <button className="boton-primario" onClick={() => setSeccion('Productos')}>
-                  <Plus size={18} /> Ver productos
+                  <Package size={18} /> Ver productos
                 </button>
               </div>
-              <TablaProductos productos={productos} />
+              <TablaProductos
+                productos={productos.slice(0, 5)}
+                editar={abrirEdicion}
+                eliminar={eliminarProducto}
+              />
             </section>
           </>
-        ) : seccion === 'Productos' || seccion === 'Inventario' ? (
+        )}
+
+        {(seccion === 'Productos' || seccion === 'Inventario') && (
           <section className="panel">
             <div className="panel-encabezado">
               <div>
                 <h3>{seccion === 'Productos' ? 'Catálogo de productos' : 'Control de inventario'}</h3>
-                <p>Información de demostración</p>
+                <p>
+                  {productos.length} productos registrados en el sistema
+                </p>
               </div>
+
+              {seccion === 'Productos' && (
+                <button className="boton-primario" onClick={abrirNuevo}>
+                  <Plus size={18} /> Nuevo producto
+                </button>
+              )}
             </div>
 
             <div className="buscador">
@@ -187,19 +311,25 @@ function App() {
               <input
                 value={busqueda}
                 onChange={e => setBusqueda(e.target.value)}
-                placeholder="Buscar producto..."
+                placeholder="Buscar por nombre, SKU o categoría..."
               />
             </div>
 
-            <TablaProductos productos={filtrados} />
+            <TablaProductos
+              productos={filtrados}
+              editar={abrirEdicion}
+              eliminar={eliminarProducto}
+            />
           </section>
-        ) : (
+        )}
+
+        {!['Dashboard', 'Productos', 'Inventario'].includes(seccion) && (
           <section className="panel pendiente">
             <div className="tarjeta-icono azul"><Boxes size={28} /></div>
             <h2>Módulo de {seccion}</h2>
             <p>
               Esta sección será implementada en los próximos Sprints.
-              Actualmente estamos construyendo la interfaz inicial.
+              Actualmente estamos desarrollando el módulo de productos.
             </p>
             <button className="boton-primario" onClick={() => setSeccion('Dashboard')}>
               Volver al Dashboard
@@ -207,30 +337,157 @@ function App() {
           </section>
         )}
       </main>
+
+      {modalAbierto && (
+        <div className="modal-fondo" onClick={() => setModalAbierto(false)}>
+          <section
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="titulo-modal"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="modal-encabezado">
+              <div>
+                <h2 id="titulo-modal">
+                  {productoEditando !== null ? 'Editar producto' : 'Registrar producto'}
+                </h2>
+                <p>Completa la información del producto tecnológico.</p>
+              </div>
+              <button className="cerrar-modal" onClick={() => setModalAbierto(false)} aria-label="Cerrar">
+                <X size={21} />
+              </button>
+            </div>
+
+            <form onSubmit={guardarProducto}>
+              <div className="form-grid">
+                <label>
+                  Código SKU *
+                  <input
+                    value={formulario.sku}
+                    onChange={e => setFormulario({ ...formulario, sku: e.target.value })}
+                    placeholder="Ej. MOU-002"
+                    required
+                  />
+                </label>
+
+                <label>
+                  Nombre del producto *
+                  <input
+                    value={formulario.nombre}
+                    onChange={e => setFormulario({ ...formulario, nombre: e.target.value })}
+                    placeholder="Nombre del producto"
+                    required
+                  />
+                </label>
+
+                <label>
+                  Categoría
+                  <select
+                    value={formulario.categoria}
+                    onChange={e => setFormulario({ ...formulario, categoria: e.target.value })}
+                  >
+                    <option>Periféricos</option>
+                    <option>Componentes</option>
+                    <option>Almacenamiento</option>
+                    <option>Monitores</option>
+                    <option>Accesorios</option>
+                    <option>Otros</option>
+                  </select>
+                </label>
+
+                <label>
+                  Existencias
+                  <input
+                    type="number"
+                    min="0"
+                    value={formulario.stock}
+                    onChange={e => setFormulario({ ...formulario, stock: Number(e.target.value) })}
+                  />
+                </label>
+
+                <label>
+                  Stock mínimo
+                  <input
+                    type="number"
+                    min="0"
+                    value={formulario.minimo}
+                    onChange={e => setFormulario({ ...formulario, minimo: Number(e.target.value) })}
+                  />
+                </label>
+
+                <label>
+                  Costo unitario (COP)
+                  <input
+                    type="number"
+                    min="1"
+                    value={formulario.costo}
+                    onChange={e => setFormulario({ ...formulario, costo: Number(e.target.value) })}
+                    required
+                  />
+                </label>
+
+                <label className="campo-completo">
+                  Precio de venta (COP)
+                  <input
+                    type="number"
+                    min="1"
+                    value={formulario.precio}
+                    onChange={e => setFormulario({ ...formulario, precio: Number(e.target.value) })}
+                    required
+                  />
+                </label>
+              </div>
+
+              {error && <p className="mensaje-error">{error}</p>}
+
+              <div className="modal-acciones">
+                <button type="button" className="boton-secundario" onClick={() => setModalAbierto(false)}>
+                  Cancelar
+                </button>
+                <button type="submit" className="boton-primario">
+                  <Save size={17} />
+                  {productoEditando !== null ? 'Guardar cambios' : 'Registrar producto'}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
     </div>
   )
 }
 
-type Producto = (typeof productos)[number]
-
-function TablaProductos({ productos: lista }: { productos: Producto[] }) {
+function TablaProductos({
+  productos,
+  editar,
+  eliminar,
+}: {
+  productos: Producto[]
+  editar: (producto: Producto) => void
+  eliminar: (id: number) => void
+}) {
   return (
     <div className="tabla-contenedor">
       <table>
         <thead>
           <tr>
-            <th>Producto</th>
+            <th>SKU / Producto</th>
             <th>Categoría</th>
             <th>Stock</th>
             <th>Costo</th>
-            <th>Precio de venta</th>
+            <th>Precio venta</th>
             <th>Estado</th>
+            <th>Acciones</th>
           </tr>
         </thead>
         <tbody>
-          {lista.map(producto => (
+          {productos.map(producto => (
             <tr key={producto.id}>
-              <td className="nombre-producto">{producto.nombre}</td>
+              <td>
+                <strong className="nombre-producto">{producto.nombre}</strong>
+                <small className="sku">{producto.sku}</small>
+              </td>
               <td>{producto.categoria}</td>
               <td>{producto.stock}</td>
               <td>{moneda(producto.costo)}</td>
@@ -240,10 +497,20 @@ function TablaProductos({ productos: lista }: { productos: Producto[] }) {
                   {producto.stock <= producto.minimo ? 'Stock bajo' : 'Disponible'}
                 </span>
               </td>
+              <td>
+                <div className="acciones-tabla">
+                  <button className="accion-editar" onClick={() => editar(producto)} title="Editar">
+                    <Pencil size={16} />
+                  </button>
+                  <button className="accion-eliminar" onClick={() => eliminar(producto.id)} title="Eliminar">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </td>
             </tr>
           ))}
-          {lista.length === 0 && (
-            <tr><td colSpan={6}>No se encontraron productos.</td></tr>
+          {productos.length === 0 && (
+            <tr><td colSpan={7}>No se encontraron productos.</td></tr>
           )}
         </tbody>
       </table>
