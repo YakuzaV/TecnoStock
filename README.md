@@ -18,7 +18,7 @@
 **Centro:** UDR Cali  
 **Zona:** Centro Sur (ZCSUR)  
 **Proyecto:** Sistema web para la gestión de inventario y análisis de rentabilidad en productos tecnológicos.  
-**Fase:** Fase 4 – Desarrollo de la propuesta ingenieril del proyecto.  
+**Fase:** Fase 4 – Desarrollo de la propuesta del proyecto.  
 **Año:** 2026
 
 ---
