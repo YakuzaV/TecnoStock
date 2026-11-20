@@ -1,11 +1,27 @@
-
-import { useState } from 'react'
+import Operaciones from './Operaciones'
+import Rentabilidad from './components/rentabilidad/Rentabilidad'
+import Reportes from './Reportes';
+import { useEffect, useState } from 'react'
+import {
+  obtenerProductos,
+  crearProducto,
+  actualizarProducto,
+  eliminarProductoAPI,
+  type ProductoAPI,
+  type ProductoDatos
+} from './services/productos'
 import {
   LayoutDashboard, Package, Warehouse, ShoppingCart,
   Receipt, ChartNoAxesCombined, FileBarChart, Bell,
   Plus, Search, Pencil, Trash2, X, Save, Boxes
 } from 'lucide-react'
 import './App.css'
+
+import {
+  obtenerMovimientos,
+  crearMovimiento,
+  type Movimiento
+} from './services/movimientos'
 
 type Producto = {
   id: number
@@ -17,14 +33,19 @@ type Producto = {
   costo: number
   precio: number
 }
+function adaptarProducto(p: ProductoAPI): Producto {
+  return {
+    id: Number(p.id),
+    sku: p.sku,
+    nombre: p.nombre,
+    categoria: p.categoria,
+    stock: Number(p.stock),
+    minimo: Number(p.stock_minimo),
+    costo: Number(p.costo_unitario),
+    precio: Number(p.precio_venta),
+  }
+}
 
-const productosIniciales: Producto[] = [
-  { id: 1, sku: 'MOU-001', nombre: 'Mouse Logitech', categoria: 'Periféricos', stock: 12, minimo: 5, costo: 35000, precio: 55000 },
-  { id: 2, sku: 'TEC-001', nombre: 'Teclado mecánico', categoria: 'Periféricos', stock: 5, minimo: 5, costo: 120000, precio: 175000 },
-  { id: 3, sku: 'SSD-001', nombre: 'SSD 1 TB', categoria: 'Almacenamiento', stock: 3, minimo: 5, costo: 210000, precio: 285000 },
-  { id: 4, sku: 'RAM-001', nombre: 'Memoria RAM 16 GB', categoria: 'Componentes', stock: 8, minimo: 5, costo: 95000, precio: 145000 },
-  { id: 5, sku: 'MON-001', nombre: 'Monitor 24 pulgadas', categoria: 'Monitores', stock: 2, minimo: 4, costo: 390000, precio: 520000 },
-]
 
 const menu = [
   { nombre: 'Dashboard', icono: LayoutDashboard },
@@ -55,12 +76,79 @@ const formularioVacio = {
 
 function App() {
   const [seccion, setSeccion] = useState('Dashboard')
-  const [productos, setProductos] = useState(productosIniciales)
+  const [productos, setProductos] = useState<Producto[]>([])
   const [busqueda, setBusqueda] = useState('')
   const [modalAbierto, setModalAbierto] = useState(false)
   const [productoEditando, setProductoEditando] = useState<number | null>(null)
   const [formulario, setFormulario] = useState(formularioVacio)
   const [error, setError] = useState('')
+  const [movimientos, setMovimientos] = useState<Movimiento[]>([])
+  const [tipoMovimiento, setTipoMovimiento] = useState<'entrada' | 'salida'>('entrada')
+  const [productoMovimiento, setProductoMovimiento] = useState('')
+  const [cantidadMovimiento, setCantidadMovimiento] = useState(1)
+  const [observacionMovimiento, setObservacionMovimiento] = useState('')
+  const [errorMovimiento, setErrorMovimiento] = useState('')
+  const [cargandoMovimientos, setCargandoMovimientos] = useState(false)
+  async function cargarHistorialMovimientos() {
+    try {
+      setCargandoMovimientos(true)
+      const datos = await obtenerMovimientos()
+      setMovimientos(datos)
+      setErrorMovimiento('')
+    } catch (err) {
+      console.error('Error al cargar movimientos:', err)
+      setErrorMovimiento('No fue posible cargar el historial.')
+    } finally {
+      setCargandoMovimientos(false)
+    }
+  }
+
+  async function cargarProductos() {
+    try {
+      setError('')
+      const datos = await obtenerProductos()
+      setProductos(datos.map(adaptarProducto))
+    } catch (err) {
+      console.error('Error al cargar productos:', err)
+      setError(err instanceof Error ? err.message : 'No fue posible cargar los productos')
+    }
+  }
+
+  async function registrarMovimiento(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setErrorMovimiento('')
+
+    if (!productoMovimiento || !Number.isInteger(cantidadMovimiento) || cantidadMovimiento < 1) {
+      setErrorMovimiento('Selecciona un producto y una cantidad válida (mínimo 1).')
+      return
+    }
+
+    try {
+      await crearMovimiento({
+        producto_id: Number(productoMovimiento),
+        tipo: tipoMovimiento,
+        cantidad: cantidadMovimiento,
+        observacion: observacionMovimiento.trim()
+      })
+      await cargarProductos()
+      await cargarHistorialMovimientos()
+      setCantidadMovimiento(1)
+      setObservacionMovimiento('')
+    } catch (err) {
+      setErrorMovimiento(err instanceof Error ? err.message : 'No fue posible registrar el movimiento.')
+    }
+  }
+
+
+  useEffect(() => {
+    cargarProductos()
+  }, [])
+
+  useEffect(() => {
+    if (seccion === 'Inventario') {
+      cargarHistorialMovimientos()
+    }
+  }, [seccion])
 
   const inventario = productos.reduce(
     (total, p) => total + p.stock * p.costo, 0
@@ -104,75 +192,119 @@ function App() {
     setModalAbierto(true)
   }
 
-  function guardarProducto(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    setError('')
+  async function guardarProducto(e: React.FormEvent<HTMLFormElement>) {
+  e.preventDefault()
+  setError('')
 
-    if (!formulario.sku.trim() || !formulario.nombre.trim()) {
-      setError('El SKU y el nombre son obligatorios.')
-      return
-    }
+  if (!formulario.sku.trim() || !formulario.nombre.trim()) {
+    setError('El SKU y el nombre son obligatorios.')
+    return
+  }
 
-    const skuRepetido = productos.some(
-      p => p.sku.toLowerCase() === formulario.sku.trim().toLowerCase()
-        && p.id !== productoEditando
-    )
+  const skuRepetido = productos.some(
+    p =>
+      p.sku.toLowerCase() === formulario.sku.trim().toLowerCase() &&
+      p.id !== productoEditando
+  )
 
-    if (skuRepetido) {
-      setError('Ya existe un producto con ese SKU.')
-      return
-    }
+  if (skuRepetido) {
+    setError('Ya existe un producto con ese SKU.')
+    return
+  }
 
-    if (
-      formulario.stock < 0 ||
-      formulario.minimo < 0 ||
-      formulario.costo <= 0 ||
-      formulario.precio <= 0
-    ) {
-      setError('Verifica las cantidades y los valores ingresados.')
-      return
-    }
+  if (
+    formulario.stock < 0 ||
+    formulario.minimo < 0 ||
+    formulario.costo <= 0 ||
+    formulario.precio <= 0
+  ) {
+    setError('Verifica las cantidades y los valores ingresados.')
+    return
+  }
 
-    if (formulario.precio < formulario.costo) {
-      setError('El precio de venta no puede ser inferior al costo.')
-      return
-    }
+  if (formulario.precio < formulario.costo) {
+    setError('El precio de venta no puede ser inferior al costo.')
+    return
+  }
 
+  const categoriasIds: Record<string, number> = {
+    'Periféricos': 1,
+    'Componentes': 2,
+    'Almacenamiento': 3,
+    'Monitores': 4,
+    'Accesorios': 5,
+    'Otros': 6,
+  }
+
+  const categoriaId = categoriasIds[formulario.categoria]
+
+  if (!categoriaId) {
+    setError('Selecciona una categoría válida.')
+    return
+  }
+
+  const datos: ProductoDatos = {
+    sku: formulario.sku.trim(),
+    nombre: formulario.nombre.trim(),
+    categoria_id: categoriaId,
+    stock: Number(formulario.stock),
+    stock_minimo: Number(formulario.minimo),
+    costo_unitario: Number(formulario.costo),
+    precio_venta: Number(formulario.precio),
+  }
+
+  try {
     if (productoEditando !== null) {
-      setProductos(actuales =>
-        actuales.map(p =>
-          p.id === productoEditando
-            ? { ...p, ...formulario, sku: formulario.sku.trim(), nombre: formulario.nombre.trim() }
-            : p
-        )
-      )
+      await actualizarProducto(productoEditando, datos)
     } else {
-      setProductos(actuales => [
-        ...actuales,
-        {
-          id: Date.now(),
-          ...formulario,
-          sku: formulario.sku.trim(),
-          nombre: formulario.nombre.trim(),
-        },
-      ])
+      await crearProducto(datos)
     }
+
+    const productosActualizados = await obtenerProductos()
+    setProductos(productosActualizados.map(adaptarProducto))
 
     setModalAbierto(false)
-  }
-
-  function eliminarProducto(id: number) {
-    const producto = productos.find(p => p.id === id)
-    if (!producto) return
-
-    const confirmar = window.confirm(
-      `¿Deseas eliminar el producto "${producto.nombre}"?`
+    setFormulario(formularioVacio)
+    setProductoEditando(null)
+    setError('')
+  } catch (err) {
+    console.error('Error al guardar producto:', err)
+    setError(
+      err instanceof Error
+        ? err.message
+        : 'No fue posible guardar el producto.'
     )
-
-    if (confirmar) {
-      setProductos(actuales => actuales.filter(p => p.id !== id))
-    }
   }
+}
+
+  async function eliminarProducto(id: number) {
+  const producto = productos.find(p => p.id === id)
+  if (!producto) return
+
+  const confirmar = window.confirm(
+    `¿Deseas eliminar el producto "${producto.nombre}"?`
+  )
+
+  if (!confirmar) return
+
+  try {
+    await eliminarProductoAPI(id)
+
+    const productosActualizados = await obtenerProductos()
+    setProductos(productosActualizados.map(adaptarProducto))
+
+    setError('')
+    alert('Producto eliminado correctamente.')
+  } catch (err) {
+    console.error('Error al eliminar producto:', err)
+
+    setError(
+      err instanceof Error
+        ? err.message
+        : 'No fue posible eliminar el producto.'
+    )
+  }
+}
 
   return (
     <div className="app">
@@ -181,7 +313,7 @@ function App() {
           <div className="marca-icono"><Boxes size={25} /></div>
           <div>
             <h2>TecnoStock</h2>
-            <small>Gestión inteligente</small>
+            <small>Gestión Inteligente</small>
           </div>
         </div>
 
@@ -289,7 +421,7 @@ function App() {
           </>
         )}
 
-        {(seccion === 'Productos' || seccion === 'Inventario') && (
+        {seccion === 'Productos' && (
           <section className="panel">
             <div className="panel-encabezado">
               <div>
@@ -323,20 +455,147 @@ function App() {
           </section>
         )}
 
-        {!['Dashboard', 'Productos', 'Inventario'].includes(seccion) && (
-          <section className="panel pendiente">
-            <div className="tarjeta-icono azul"><Boxes size={28} /></div>
-            <h2>Módulo de {seccion}</h2>
-            <p>
-              Esta sección será implementada en los próximos Sprints.
-              Actualmente estamos desarrollando el módulo de productos.
-            </p>
-            <button className="boton-primario" onClick={() => setSeccion('Dashboard')}>
-              Volver al Dashboard
-            </button>
-          </section>
-        )}
-      </main>
+        {seccion === 'Inventario' && (
+  <section className="panel">
+    <div className="panel-encabezado">
+      <div>
+        <h3>Control de inventario</h3>
+        <p>Registra entradas y salidas de productos</p>
+      </div>
+    </div>
+
+    <form onSubmit={registrarMovimiento} className="form-movimiento">
+      <div className="form-grid-movimiento">
+        <label>
+          Tipo de movimiento
+          <select
+            value={tipoMovimiento}
+            onChange={e =>
+              setTipoMovimiento(e.target.value as 'entrada' | 'salida')
+            }
+          >
+            <option value="entrada">Entrada de inventario</option>
+            <option value="salida">Salida de inventario</option>
+          </select>
+        </label>
+
+        <label>
+          Producto
+          <select
+            value={productoMovimiento}
+            onChange={e => setProductoMovimiento(e.target.value)}
+            required
+          >
+            <option value="">Selecciona un producto</option>
+            {productos.map(producto => (
+              <option key={producto.id} value={producto.id}>
+                {producto.sku} - {producto.nombre} (Stock: {producto.stock})
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label>
+          Cantidad
+          <input
+            type="number"
+            min="1"
+            step="1"
+            value={cantidadMovimiento}
+            onChange={e => setCantidadMovimiento(Number(e.target.value))}
+            required
+          />
+        </label>
+
+        <label>
+          Observación
+          <input
+            type="text"
+            value={observacionMovimiento}
+            onChange={e => setObservacionMovimiento(e.target.value)}
+            placeholder="Ej. Compra a proveedor o venta realizada"
+          />
+        </label>
+      </div>
+
+      {errorMovimiento && (
+        <p className="mensaje-error">{errorMovimiento}</p>
+      )}
+
+      <button
+        type="submit"
+        className="boton-primario"
+        disabled={cargandoMovimientos}
+      >
+        {tipoMovimiento === 'entrada'
+          ? 'Registrar entrada'
+          : 'Registrar salida'}
+      </button>
+    </form>
+
+    <div className="panel-encabezado encabezado-historial">
+      <div>
+        <h3>Historial de movimientos</h3>
+        <p>Movimientos registrados en el sistema</p>
+      </div>
+    </div>
+
+    {cargandoMovimientos ? (
+      <p>Cargando movimientos...</p>
+    ) : movimientos.length === 0 ? (
+      <p>No hay movimientos registrados.</p>
+    ) : (
+      <div className="tabla-contenedor">
+        <table className="tabla">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Producto</th>
+              <th>Tipo</th>
+              <th>Cantidad</th>
+              <th>Stock anterior</th>
+              <th>Stock nuevo</th>
+              <th>Observación</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {movimientos.map(movimiento => (
+              <tr key={movimiento.id}>
+                <td>
+                  {new Date(movimiento.created_at).toLocaleString('es-CO')}
+                </td>
+                <td>
+                  <strong>{movimiento.producto}</strong>
+                  <small>{movimiento.sku}</small>
+                </td>
+                <td>
+                  <span
+                    className={`estado-movimiento ${movimiento.tipo}`}
+                  >
+                    {movimiento.tipo === 'entrada' ? 'Entrada' : 'Salida'}
+                  </span>
+                </td>
+                <td>{movimiento.cantidad}</td>
+                <td>{movimiento.stock_anterior}</td>
+                <td>{movimiento.stock_nuevo}</td>
+                <td>{movimiento.observacion || '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </section>
+)}
+
+        {(seccion === 'Compras' || seccion === 'Ventas') && (
+  <Operaciones />
+)}
+
+{seccion === 'Rentabilidad' && <Rentabilidad />}
+
+{seccion === 'Reportes' && <Reportes />}
 
       {modalAbierto && (
         <div className="modal-fondo" onClick={() => setModalAbierto(false)}>
@@ -454,6 +713,7 @@ function App() {
           </section>
         </div>
       )}
+      </main>
     </div>
   )
 }
