@@ -1,32 +1,104 @@
-# React + TypeScript + Vite
+# TecnoStock – Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+## Descripción
 
-Currently, two official plugins are available:
+El frontend de TecnoStock corresponde a la capa de presentación de la aplicación web para la gestión de inventario y análisis de rentabilidad en productos tecnológicos.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Fue desarrollado con React y TypeScript, utilizando Vite como herramienta de desarrollo y construcción del proyecto.
 
-## React Compiler
+Su propósito es proporcionar una interfaz de usuario organizada por módulos para consultar y gestionar la información comercial del sistema.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Tecnologías utilizadas
 
-## Expanding the Oxlint configuration
+- React 19.3.1
+- React DOM 19.3.1
+- TypeScript 7.0.2
+- Vite 8.3.6
+- Lucide React 1.72.0
+- ESLint 9.0.0
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+## Estructura del frontend
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```text
+frontend/
+├── public/
+├── src/
+│   ├── assets/
+│   ├── components/
+│   │   └── rentabilidad/
+│   ├── services/
+│   ├── App.tsx
+│   ├── App.css
+│   ├── index.css
+│   └── main.tsx
+├── index.html
+├── package.json
+├── package-lock.json
+└── vite.config.ts
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Módulos de la aplicación
+
+La interfaz integra las siguientes funcionalidades:
+
+- Dashboard: consulta general de indicadores e información del inventario.
+- Productos: administración del catálogo de productos tecnológicos.
+- Inventario: consulta y control de existencias y movimientos.
+- Compras: registro de adquisiciones de productos.
+- Ventas: registro de operaciones comerciales.
+- Rentabilidad: consulta de ingresos, costos, utilidad y márgenes.
+- Reportes: consulta y exportación de información en formato CSV.
+
+## Requisitos previos
+
+- Node.js compatible con la versión de Vite utilizada.
+- npm.
+- Backend de TecnoStock configurado y en ejecución para utilizar las funcionalidades que requieren conexión con la API.
+
+## Instalación
+
+Desde una terminal, ubicarse en la carpeta `frontend` y ejecutar:
+
+```bash
+npm install
+```
+
+## Ejecución en desarrollo
+
+```bash
+npm run dev
+```
+
+Vite iniciará el servidor de desarrollo y mostrará en la terminal la dirección local para acceder a la aplicación.
+
+## Construcción del proyecto
+
+Para generar la versión de producción:
+
+```bash
+npm run build
+```
+
+## Vista previa de producción
+
+```bash
+npm run preview
+```
+
+## Verificación del código
+
+Para ejecutar las reglas de análisis estático configuradas:
+
+```bash
+npm run lint
+```
+
+## Integración con el backend
+
+El frontend consume los servicios de la API de TecnoStock para realizar consultas y operaciones relacionadas con los productos, movimientos de inventario, compras, ventas y rentabilidad.
+
+La disponibilidad de estas funcionalidades depende de la configuración y ejecución del backend y de la conexión con la base de datos PostgreSQL.
+
+## Proyecto académico
+
+Este componente forma parte del proyecto aplicado TecnoStock, desarrollado en el programa de Ingeniería de Sistemas de la Universidad Nacional Abierta y a Distancia (UNAD).
