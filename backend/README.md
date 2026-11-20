@@ -65,11 +65,21 @@ npm install
 
 ## 7. Configuración de variables de entorno
 
-El proyecto utiliza dotenv para cargar la configuración del entorno.
+El backend utiliza la biblioteca `dotenv` para gestionar los parámetros de conexión con PostgreSQL mediante variables de entorno.
 
-Se debe crear un archivo `.env` en la carpeta `backend`, con los parámetros de conexión a PostgreSQL que utiliza el módulo `src/config/database.js`.
+Se debe crear un archivo `.env` dentro de la carpeta `backend`, con la siguiente estructura:
 
-Las credenciales deben mantenerse de forma local y no deben publicarse en GitHub.
+```env
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=nombre_de_la_base_de_datos
+DB_USER=usuario_postgresql
+DB_PASSWORD=contraseña_postgresql
+```
+
+Los valores deben corresponder a la configuración local del servidor PostgreSQL.
+
+El archivo `.env` contiene información privada y está excluido del repositorio mediante `.gitignore`. Por esta razón, no debe publicarse en GitHub ni compartirse con terceros.
 
 ## 8. Ejecución del servidor
 
